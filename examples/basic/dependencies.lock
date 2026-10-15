@@ -1,0 +1,47 @@
+dependencies:
+  idf:
+    source:
+      type: idf
+    version: 6.0.1
+  my_adc_component:
+    component_hash: cc2e6cea95f33a0f7b6cd000fc168aba10c83ed3b3225288eafa4f1dff7c9415
+    dependencies: []
+    source:
+      git: https://github.com/amjs456/my_adc_component.git
+      path: .
+      type: git
+    version: 2a4a5af802265471f371d82a194618a9bc538071
+  my_dac_component:
+    component_hash: 575516e1c7fc135fa144fb1a8571e42c0f597b3a5ebce87f78ac10bac49da607
+    dependencies: []
+    source:
+      git: https://github.com/amjs456/my_dac_component.git
+      path: .
+      type: git
+    version: 12db1430f091a9bec9946fd5a073f22bcd168159
+  my_guitar_fx_core:
+    component_hash: 70cc8e2f9c766e6b5d8492106df22e48ae212554e64d230e9aa17b9243ee4116
+    dependencies:
+    - git: https://github.com/amjs456/my_dac_component.git
+      name: my_dac_component
+      path: .
+    - git: https://github.com/amjs456/my_adc_component.git
+      name: my_adc_component
+      path: .
+    source:
+      git: https://github.com/amjs456/my_guitar_fx_core
+      path: .
+      type: git
+    version: 1018ad87b7351f97b81387e8102607360d21c6d3
+  my_guitar_fx_effects:
+    dependencies: []
+    source:
+      path: ../..
+      type: local
+    version: '*'
+direct_dependencies:
+- my_guitar_fx_core
+- my_guitar_fx_effects
+manifest_hash: ce23f8e0c9b2a10e0bbcea060084868bb48b2741245ee74de1f0fd585077fec3
+target: esp32
+version: 3.0.0

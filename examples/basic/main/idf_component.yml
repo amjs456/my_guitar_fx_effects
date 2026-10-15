@@ -1,0 +1,7 @@
+dependencies:
+  my_guitar_fx_effects:
+    path: ../../..
+
+  my_guitar_fx_core:
+    git: https://github.com/amjs456/my_guitar_fx_core
+    path: .
