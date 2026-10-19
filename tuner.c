@@ -30,36 +30,40 @@ typedef enum {
 
 
 typedef struct {
-    float *fft_input;
-    BufferState *fft_input_buffer_state;
+    float sample_buf[2][FFT_SIZE];
+    BufferState sample_buf_state[2];
 } fft_task_args_t;
 
 void fft_task(void *args){
     fft_task_args_t *fft_task_args = (fft_task_args_t *)args;
 
+    static float window[FFT_SIZE];
+    dsps_wind_hann_f32(window, FFT_SIZE);
+    ESP_ERROR_CHECK(dsps_fft2r_init_fc32(NULL, FFT_SIZE));
+
+    static float fft_buf[FFT_SIZE * 2];
+
     while(1){
-        xTaskNotifyWait(0, 0, NULL, portMAX_DELAY);
         for(int i = 0; i < 2; i++){
-            if(fft_task_args->fft_input_buffer_state[i] == BUFFER_STATE_READY){
-                //ここでfft
-                fft_task_args->fft_input_buffer_state[i] = BUFFER_STATE_FREE;
+            if(fft_task_args->sample_buf_state[i] == BUFFER_STATE_READY){
+                fft_task_args->sample_buf_state[i] = BUFFER_STATE_PROCESSING;
+                for(int j = 0; j < FFT_SIZE; j++){
+                    fft_buf[j * 2] = fft_task_args->sample_buf[i][j] * window[j];
+                    fft_buf[j * 2 + 1] = 0.0f;
+                }
+                fft_task_args->sample_buf_state[i] = BUFFER_STATE_FREE;
                 break;
             }
         }
+        vTaskDelay(1);
     }
 }
 
-float fft_input[2][FFT_SIZE * 2];
-
 float tuner(float data){
     static bool initialized = false;
-    static float window[FFT_SIZE];
-
-    static BufferState fft_input_buffer_state[2] = {BUFFER_STATE_FREE, BUFFER_STATE_FREE};
 
     static fft_task_args_t fft_task_args = {
-        .fft_input = *fft_input,
-        .fft_input_buffer_state = fft_input_buffer_state,
+        .sample_buf_state = {BUFFER_STATE_FREE, BUFFER_STATE_FREE},
     };
 
     if(!initialized){
@@ -67,37 +71,25 @@ float tuner(float data){
         if(ret != pdPASS){
             ESP_LOGE(TAG, "fft_task creation failef");
         }
-        ESP_ERROR_CHECK(dsps_fft2r_init_fc32(NULL, FFT_SIZE));
-        dsps_wind_hann_f32(window, FFT_SIZE);
         initialized = true;
     }
 
+
     static int count = 0;
-    static float samples[FFT_SIZE];
 
-    if(count >= FFT_SIZE){
-        for(int i = 0; i < 2; i++){
-            if(fft_input_buffer_state[i] == BUFFER_STATE_FREE){
-                fft_input_buffer_state[i] = BUFFER_STATE_WRITING;
-            
-                for(int j = 0; j < FFT_SIZE; j++){
-                    fft_input[i][j * 2] = samples[j] * window [j];
-                    fft_input[i][j * 2 + 1] = 0.0f;
-                }
-
-                fft_input_buffer_state[i] = BUFFER_STATE_READY;
-                xTaskNotify(fft_task_handle, 0, eNoAction);
-
-                memmove(samples, samples + HOP_SIZE, (FFT_SIZE - HOP_SIZE) * sizeof(float));
-                
-                break;
-            }
+    static int i = 0;
+    if(fft_task_args.sample_buf_state[i] == BUFFER_STATE_FREE || fft_task_args.sample_buf_state[i] == BUFFER_STATE_WRITING){
+        fft_task_args.sample_buf_state[i] = BUFFER_STATE_WRITING;
+        if(count >= FFT_SIZE) {
+            fft_task_args.sample_buf_state[i] = BUFFER_STATE_READY;
+            count = 0;
+            i = 0;
         }
-        count = FFT_SIZE - HOP_SIZE;
+        fft_task_args.sample_buf[i][count] = data;
+        count++;
+    } else {
+        i = 1;
     }
-
-    samples[count] = data;
-    count++;
 
     return data;
 }
