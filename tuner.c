@@ -15,7 +15,7 @@
 #include "esp_dsp.h"
 #include "portmacro.h"
 
-#define FFT_SIZE 4096
+#define FFT_SIZE 8192
 
 static const char *TAG = "esp_tuner";
 static TaskHandle_t fft_task_handle;
@@ -43,6 +43,8 @@ void fft_task(void *args){
 
     static float fft_buf[FFT_SIZE * 2];
 
+    esp_err_t err;
+
     while(1){
         for(int i = 0; i < 2; i++){
             bool ready = false;
@@ -60,7 +62,25 @@ void fft_task(void *args){
                     fft_buf[j * 2 + 1] = 0.0f;
                 }
 
-                //ここでFFT
+                ESP_ERROR_CHECK(dsps_fft2r_fc32(fft_buf, FFT_SIZE));
+                ESP_ERROR_CHECK(dsps_bit_rev_fc32(fft_buf, FFT_SIZE));
+
+                static float power_buf[FFT_SIZE];
+                for(int k = 0; k < FFT_SIZE; k++){
+                    float re = fft_buf[2 * k];
+                    float im = fft_buf[2 * k + 1];
+                    float power = re * re + im * im;
+                    power_buf[k] = power;
+                }
+
+                int max_index = 0;
+                for (int l = 1; l<FFT_SIZE;l++){
+                    if(power_buf[l] > power_buf[max_index]){
+                        max_index = l;
+                    }
+                }
+                printf("%f\n", power_buf[max_index]);
+                printf("%d\n", max_index);
 
                 portENTER_CRITICAL(&mux);
                 fft_task_args->sample_buf_state[i] = BUFFER_STATE_FREE;
