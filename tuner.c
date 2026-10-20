@@ -45,10 +45,16 @@ void fft_task(void *args){
 
     while(1){
         for(int i = 0; i < 2; i++){
+            bool ready = false;
+
+            portENTER_CRITICAL(&mux);
             if(fft_task_args->sample_buf_state[i] == BUFFER_STATE_READY){
-                portENTER_CRITICAL(&mux);
                 fft_task_args->sample_buf_state[i] = BUFFER_STATE_PROCESSING;
-                portEXIT_CRITICAL(&mux);
+                ready = true;
+            }
+            portEXIT_CRITICAL(&mux);
+
+            if(ready){
                 for(int j = 0; j < FFT_SIZE; j++){
                     fft_buf[j * 2] = fft_task_args->sample_buf[i][j] * window[j];
                     fft_buf[j * 2 + 1] = 0.0f;
@@ -75,10 +81,12 @@ float tuner(float data){
 
     if(!initialized){
         BaseType_t ret = xTaskCreate(fft_task, "fft_task", 4906, &fft_task_args, 5, &fft_task_handle);
-        if(ret != pdPASS){
+        if(ret == pdPASS){
+            initialized = true;
+        } else {
             ESP_LOGE(TAG, "fft_task creation failef");
         }
-        initialized = true;
+        
     }
 
 
@@ -88,7 +96,7 @@ float tuner(float data){
     portENTER_CRITICAL(&mux);
     if(i == -1){
         for(int j = 0; j < 2; j++){
-            if(fft_task_args.sample_buf_state[i] == BUFFER_STATE_FREE){
+            if(fft_task_args.sample_buf_state[j] == BUFFER_STATE_FREE){
                 i = j;
                 count = 0;
                 fft_task_args.sample_buf_state[i] = BUFFER_STATE_WRITING;
