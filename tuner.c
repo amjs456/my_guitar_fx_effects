@@ -16,10 +16,10 @@
 #include "portmacro.h"
 
 #define FFT_SIZE 4096
-#define HOP_SIZE 1024
 
 static const char *TAG = "esp_tuner";
 static TaskHandle_t fft_task_handle;
+static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 
 typedef enum {
     BUFFER_STATE_FREE,
@@ -46,12 +46,19 @@ void fft_task(void *args){
     while(1){
         for(int i = 0; i < 2; i++){
             if(fft_task_args->sample_buf_state[i] == BUFFER_STATE_READY){
+                portENTER_CRITICAL(&mux);
                 fft_task_args->sample_buf_state[i] = BUFFER_STATE_PROCESSING;
+                portEXIT_CRITICAL(&mux);
                 for(int j = 0; j < FFT_SIZE; j++){
                     fft_buf[j * 2] = fft_task_args->sample_buf[i][j] * window[j];
                     fft_buf[j * 2 + 1] = 0.0f;
                 }
+
+                //ここでFFT
+
+                portENTER_CRITICAL(&mux);
                 fft_task_args->sample_buf_state[i] = BUFFER_STATE_FREE;
+                portEXIT_CRITICAL(&mux);
                 break;
             }
         }
@@ -76,20 +83,35 @@ float tuner(float data){
 
 
     static int count = 0;
+    static int i = -1;
 
-    static int i = 0;
-    if(fft_task_args.sample_buf_state[i] == BUFFER_STATE_FREE || fft_task_args.sample_buf_state[i] == BUFFER_STATE_WRITING){
-        fft_task_args.sample_buf_state[i] = BUFFER_STATE_WRITING;
-        if(count >= FFT_SIZE) {
-            fft_task_args.sample_buf_state[i] = BUFFER_STATE_READY;
-            count = 0;
-            i = 0;
+    portENTER_CRITICAL(&mux);
+    if(i == -1){
+        for(int j = 0; j < 2; j++){
+            if(fft_task_args.sample_buf_state[i] == BUFFER_STATE_FREE){
+                i = j;
+                count = 0;
+                fft_task_args.sample_buf_state[i] = BUFFER_STATE_WRITING;
+                break;
+            }
         }
-        fft_task_args.sample_buf[i][count] = data;
-        count++;
-    } else {
-        i = 1;
     }
+
+    if(i != -1){
+        fft_task_args.sample_buf[i][count++] = data;
+        if(count == FFT_SIZE){
+            fft_task_args.sample_buf_state[i] = BUFFER_STATE_READY;
+            int next = !i;
+            if(fft_task_args.sample_buf_state[next] == BUFFER_STATE_FREE){
+                i = next;
+                fft_task_args.sample_buf_state[i] = BUFFER_STATE_WRITING;
+            } else {
+                i = -1;
+            }
+            count = 0;
+        }
+    }
+    portEXIT_CRITICAL(&mux);
 
     return data;
 }
