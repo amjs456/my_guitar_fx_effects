@@ -15,11 +15,17 @@
 #include "esp_dsp.h"
 #include "portmacro.h"
 
-#define FFT_SIZE 8192
+#define FFT_SIZE 4096
+#define FFT_LEN (FFT_SIZE * 2)
+#define SAMPLE_RATE 48000.0f
 
 static const char *TAG = "esp_tuner";
 static TaskHandle_t fft_task_handle;
 static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+
+static float autocorr[FFT_SIZE];
+static int min_lag = 130;
+static int max_lag = 600;
 
 typedef enum {
     BUFFER_STATE_FREE,
@@ -39,55 +45,78 @@ void fft_task(void *args){
 
     static float window[FFT_SIZE];
     dsps_wind_hann_f32(window, FFT_SIZE);
-    ESP_ERROR_CHECK(dsps_fft2r_init_fc32(NULL, FFT_SIZE));
+    ESP_ERROR_CHECK(dsps_fft2r_init_fc32(NULL, FFT_LEN));
 
-    static float fft_buf[FFT_SIZE * 2];
-
-    esp_err_t err;
+    static float fft_buf[FFT_LEN * 2];
 
     while(1){
-        for(int i = 0; i < 2; i++){
-            bool ready = false;
+        int index = -1;
 
-            portENTER_CRITICAL(&mux);
+        portENTER_CRITICAL(&mux);
+        for(int i = 0; i < 2; i++){
             if(fft_task_args->sample_buf_state[i] == BUFFER_STATE_READY){
                 fft_task_args->sample_buf_state[i] = BUFFER_STATE_PROCESSING;
-                ready = true;
-            }
-            portEXIT_CRITICAL(&mux);
-
-            if(ready){
-                for(int j = 0; j < FFT_SIZE; j++){
-                    fft_buf[j * 2] = fft_task_args->sample_buf[i][j] * window[j];
-                    fft_buf[j * 2 + 1] = 0.0f;
-                }
-
-                ESP_ERROR_CHECK(dsps_fft2r_fc32(fft_buf, FFT_SIZE));
-                ESP_ERROR_CHECK(dsps_bit_rev_fc32(fft_buf, FFT_SIZE));
-
-                static float power_buf[FFT_SIZE];
-                for(int k = 0; k < FFT_SIZE; k++){
-                    float re = fft_buf[2 * k];
-                    float im = fft_buf[2 * k + 1];
-                    float power = re * re + im * im;
-                    power_buf[k] = power;
-                }
-
-                int max_index = 0;
-                for (int l = 1; l<FFT_SIZE;l++){
-                    if(power_buf[l] > power_buf[max_index]){
-                        max_index = l;
-                    }
-                }
-                printf("%f\n", power_buf[max_index]);
-                printf("%d\n", max_index);
-
-                portENTER_CRITICAL(&mux);
-                fft_task_args->sample_buf_state[i] = BUFFER_STATE_FREE;
-                portEXIT_CRITICAL(&mux);
+                index = i;
                 break;
             }
         }
+
+        portEXIT_CRITICAL(&mux);
+
+
+        if(index == -1){
+            vTaskDelay(1);
+            continue;
+        }
+
+        float mean = 0.0f;
+
+        for (int j = 0; j <FFT_SIZE; j++){
+            mean += fft_task_args->sample_buf[index][j];
+        }
+
+        mean /= FFT_SIZE;
+
+        memset(fft_buf, 0, sizeof(fft_buf));
+        
+        for(int j = 0; j < FFT_SIZE; j++){
+            fft_buf[j * 2] = (fft_task_args->sample_buf[index][j] - mean) * window[j];
+        }
+
+        ESP_ERROR_CHECK(dsps_fft2r_fc32(fft_buf, FFT_LEN));
+        ESP_ERROR_CHECK(dsps_bit_rev_fc32(fft_buf, FFT_LEN));
+
+        for(int j = 0; j < FFT_LEN; j++){
+            float re = fft_buf[2 * j];
+            float im = fft_buf[2 * j + 1];
+            fft_buf[2 * j] = re * re + im * im;
+            fft_buf[2 * j + 1] = 0.0f;
+        }
+
+        ESP_ERROR_CHECK(dsps_fft2r_fc32(fft_buf, FFT_LEN));
+        ESP_ERROR_CHECK(dsps_bit_rev_fc32(fft_buf, FFT_LEN));
+
+        for(int j = 0; j < FFT_SIZE; j++){
+            autocorr[j] = fft_buf[2 * j] / FFT_LEN;
+        }
+
+        if(autocorr[0] > 1e-8f){
+            float max_value = autocorr[min_lag];
+            int peak_lag = min_lag;
+                
+            for(int j = min_lag + 1; j <= max_lag; j++){
+                if(autocorr[j] > max_value){
+                    max_value = autocorr[j];
+                    peak_lag = j;
+                }
+            }
+            float frequency = SAMPLE_RATE / peak_lag;
+            printf("lag=%d, frequency=%.2f\n", peak_lag, frequency);
+        }
+
+        portENTER_CRITICAL(&mux);
+        fft_task_args->sample_buf_state[index] = BUFFER_STATE_FREE;
+        portEXIT_CRITICAL(&mux);   
         vTaskDelay(1);
     }
 }
