@@ -5,3 +5,5 @@ dependencies:
   my_guitar_fx_core:
     git: https://github.com/amjs456/my_guitar_fx_core
     path: .
+
+  espressif/esp-dsp: "*"

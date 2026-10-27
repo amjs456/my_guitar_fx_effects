@@ -1,4 +1,6 @@
 #include <stdint.h>
+#include "tuner.h"
 
-
-uint32_t tuner(uint32_t data);
+float tuner(float data, void *args);
+float delay(float data, void *args);
+float distortion(float data, void *args);

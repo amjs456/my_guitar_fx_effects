@@ -1,26 +1,36 @@
 dependencies:
+  espressif/esp-dsp:
+    component_hash: ed9ac175b14e0414399a2b33c525579414b5bad19a2a67b12ea212def96f9a98
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.2'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.8.2
   idf:
     source:
       type: idf
     version: 6.0.1
   my_adc_component:
-    component_hash: cc2e6cea95f33a0f7b6cd000fc168aba10c83ed3b3225288eafa4f1dff7c9415
+    component_hash: a9a5d2ad2b0b32eb53b165c16620837e4021440ec0571662823747df6191dd47
     dependencies: []
     source:
       git: https://github.com/amjs456/my_adc_component.git
       path: .
       type: git
-    version: 2a4a5af802265471f371d82a194618a9bc538071
+    version: 3189f1e4f7e819a8c02757ed49cc360917f25dce
   my_dac_component:
-    component_hash: 575516e1c7fc135fa144fb1a8571e42c0f597b3a5ebce87f78ac10bac49da607
+    component_hash: 07d20f017a30efe1d91ad4e2800d6144e6cbfee56fdf2ae067892d436e513a80
     dependencies: []
     source:
       git: https://github.com/amjs456/my_dac_component.git
       path: .
       type: git
-    version: 12db1430f091a9bec9946fd5a073f22bcd168159
+    version: f702e4356499e2c0b3328764a111994d5c6ed76b
   my_guitar_fx_core:
-    component_hash: 70cc8e2f9c766e6b5d8492106df22e48ae212554e64d230e9aa17b9243ee4116
+    component_hash: 5670d0948c40e5c813a8163afde35ba99ac58789e4df9c9379cb58f1c3d338f9
     dependencies:
     - git: https://github.com/amjs456/my_dac_component.git
       name: my_dac_component
@@ -32,16 +42,21 @@ dependencies:
       git: https://github.com/amjs456/my_guitar_fx_core
       path: .
       type: git
-    version: 1018ad87b7351f97b81387e8102607360d21c6d3
+    version: 6a2347da3dbf7ebf158b081cd98227670fc9a4ac
   my_guitar_fx_effects:
-    dependencies: []
+    dependencies:
+    - name: idf
+      version: '>=4.1.0'
+    - name: espressif/esp-dsp
+      version: '*'
     source:
       path: ../..
       type: local
     version: '*'
 direct_dependencies:
+- espressif/esp-dsp
 - my_guitar_fx_core
 - my_guitar_fx_effects
-manifest_hash: ce23f8e0c9b2a10e0bbcea060084868bb48b2741245ee74de1f0fd585077fec3
-target: esp32
+manifest_hash: 9f6313f3adf46e81aec7321f55f950b875224d5af1aff3ed6f498f2cb83d168f
+target: esp32s3
 version: 3.0.0
