@@ -1,4 +1,3 @@
-#include "freertos/idf_additions.h"
 #include "my_guitar_fx_effects.h"
 
 #include "freertos/FreeRTOS.h"
@@ -9,6 +8,7 @@
 #include "my_guitar_fx_core.h"
 #include "portmacro.h"
 #include "tuner.h"
+#include "delay.h"
 
 void print_tuning_result_task(void *args){
     QueueHandle_t queue_handle = (QueueHandle_t)args;
@@ -25,6 +25,12 @@ tuner_arg_t tuner_arg = {
         .tuning = "Standard",
     };
 
+delay_args_t delay_args = {
+    .delay_time = 500,
+    .feedback = 95,
+    .mix = 50
+};
+
 void app_main(void)
 {
     QueueHandle_t queue_handle = xQueueCreate(1, sizeof(TuningResult));
@@ -32,6 +38,7 @@ void app_main(void)
 
     fx_t fx_array[] = {
         {tuner, &tuner_arg},
+        {delay, &delay_args},
     };
 
     size_t fx_array_length = sizeof(fx_array) / sizeof(fx_array[0]);
