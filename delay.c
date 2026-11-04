@@ -1,5 +1,7 @@
 #include "delay.h"
 
+#include "dsps_biquad.h"
+#include "esp_err.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include <stddef.h>
@@ -7,6 +9,7 @@
 #include <math.h>
 #include <stdio.h>
 #include "string.h"
+#include "dsps_biquad_gen.h"
 
 static char *TAG = "my_guitar_fx_delay";
 
@@ -23,19 +26,33 @@ float delay(float data, void *args){
 
     delay_args_t *delay_args = (delay_args_t *)args;
 
+    static bool initialized = false;
+
+    static float coeffs[5];
+    static float f = 4000.0f /  48000.0f;
+    static float q = 0.707f;
+    static float w[2] = {0.0f, 0.0f};
+
     static float *buf = NULL;
     static int write_index = 0;
 
-    if(buf == NULL){
-        buf = heap_caps_calloc(
+    if(!initialized){
+        if(buf == NULL){
+            buf = heap_caps_calloc(
             BUF_SIZE,
             sizeof(float),
             MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT
-        );
+            );
+        }
+
         if(buf == NULL){
             ESP_LOGE(TAG, "buffer creation failed");
             return data;
         }
+
+        ESP_ERROR_CHECK(dsps_biquad_gen_lpf_f32(coeffs, f, q));
+        
+        initialized = true;
     }
 
     int delay_time = delay_args->delay_time;
@@ -77,7 +94,10 @@ float delay(float data, void *args){
     float feedback_gain = feedback / 100.0f;
     float wet = mix / 100.0f;
 
-    buf[write_index] = data + delayed * feedback_gain;
+    float filtered = 0.0f;
+    dsps_biquad_f32(&delayed, &filtered, 1, coeffs, w);
+
+    buf[write_index] = data + filtered * feedback_gain;
     write_index++;
 
     if(write_index >= BUF_SIZE){
