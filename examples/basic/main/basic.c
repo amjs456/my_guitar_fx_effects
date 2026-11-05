@@ -9,6 +9,17 @@
 #include "portmacro.h"
 #include "tuner.h"
 #include "delay.h"
+#include "dbfs_meter.h"
+
+void print_dbfs_meter_result_task(void *args){
+    QueueHandle_t queue_handle = (QueueHandle_t)args;
+    while(1){
+        dbfs_result_t dbfs_result;
+        xQueueReceive(queue_handle, &dbfs_result, portMAX_DELAY);
+        printf("RMS: %.2f dBFS | PEAK: %.2f dBFS\n", dbfs_result.rms_dbfs, dbfs_result.peak_dbfs);
+        vTaskDelay(1);
+    }
+}
 
 void print_tuning_result_task(void *args){
     QueueHandle_t queue_handle = (QueueHandle_t)args;
@@ -19,6 +30,8 @@ void print_tuning_result_task(void *args){
         vTaskDelay(1);
     }
 }
+
+dbfs_meter_args_t dbfs_meter_args;
 
 tuner_arg_t tuner_arg = {
         .reference_frequency_hz = 440.0f,
@@ -31,12 +44,17 @@ delay_args_t delay_args = {
     .mix = 50
 };
 
+
 void app_main(void)
 {
-    QueueHandle_t queue_handle = xQueueCreate(1, sizeof(TuningResult));
-    tuner_arg.queue_handle = queue_handle;
+    QueueHandle_t dbfs_meter_queue_handle = xQueueCreate(1, sizeof(dbfs_result_t));
+    dbfs_meter_args.queue_handle = dbfs_meter_queue_handle;
+
+    QueueHandle_t tuning_queue_handle = xQueueCreate(1, sizeof(TuningResult));
+    tuner_arg.queue_handle = tuning_queue_handle;
 
     fx_t fx_array[] = {
+        {dbfs_meter, &dbfs_meter_args},
         {tuner, &tuner_arg},
         {delay, &delay_args},
     };
@@ -44,5 +62,6 @@ void app_main(void)
     size_t fx_array_length = sizeof(fx_array) / sizeof(fx_array[0]);
     ESP_ERROR_CHECK(my_guitar_fx_core_init(fx_array, fx_array_length));
     ESP_ERROR_CHECK(start_tasks());
-    xTaskCreate(print_tuning_result_task, "print_tuning_result_task", 4096, queue_handle, 5, NULL);
+    xTaskCreate(print_tuning_result_task, "print_tuning_result_task", 4096, tuning_queue_handle, 5, NULL);
+    xTaskCreate(print_dbfs_meter_result_task, "print_dbfs_meter_result_task", 4096, dbfs_meter_queue_handle, 5, NULL);
 }
