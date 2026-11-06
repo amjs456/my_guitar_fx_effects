@@ -10,6 +10,8 @@
 #include "tuner.h"
 #include "delay.h"
 #include "dbfs_meter.h"
+#include "distortion.h"
+
 
 void print_dbfs_meter_result_task(void *args){
     QueueHandle_t queue_handle = (QueueHandle_t)args;
@@ -44,6 +46,10 @@ delay_args_t delay_args = {
     .mix = 50
 };
 
+distortion_args_t distortion_args = {
+    .gain_db = 20.0f
+};
+
 
 void app_main(void)
 {
@@ -54,9 +60,10 @@ void app_main(void)
     tuner_arg.queue_handle = tuning_queue_handle;
 
     fx_t fx_array[] = {
-        {dbfs_meter, &dbfs_meter_args},
-        {tuner, &tuner_arg},
-        {delay, &delay_args},
+        //{dbfs_meter, &dbfs_meter_args},
+        //{tuner, &tuner_arg},
+        //{delay, &delay_args},
+        {distortion, &distortion_args},
     };
 
     size_t fx_array_length = sizeof(fx_array) / sizeof(fx_array[0]);
