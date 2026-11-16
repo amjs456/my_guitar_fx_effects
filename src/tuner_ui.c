@@ -41,9 +41,6 @@ lv_obj_t *tuner_ui_create(lv_obj_t *parent, void *args){
 
     lv_obj_t *container = lv_obj_create(parent);
     lv_obj_set_name(container, "Tuner");
-    lv_obj_add_flag(container, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_set_style_pad_all(container, 0, 0);
-    lv_obj_set_size(container, 320, 200);
 
     lv_obj_t *title_lbl = lv_label_create(container);
     lv_label_set_text(title_lbl, "Tuner");
