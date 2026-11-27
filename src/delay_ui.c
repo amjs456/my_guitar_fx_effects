@@ -2,6 +2,7 @@
 
 #include "lvgl.h"
 #include "delay.h"
+#include "misc/lv_area.h"
 #include "my_guitar_fx_ui_types.h"
 #include "slider.h"
 
@@ -17,6 +18,7 @@ lv_obj_t *delay_ui_create(lv_obj_t *parent, void *args){
 
     lv_obj_t *container = lv_obj_create(parent);
     lv_obj_set_name(container, "Delay");
+    lv_obj_set_size(container, lv_pct(100), LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(container, LV_FLEX_FLOW_COLUMN);
 
 
